@@ -1,0 +1,42 @@
+{
+  "name": "bsc-escrow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint:js": "node_modules/.bin/eslint .",
+    "lint:sol": "node_modules/.bin/solhint \"**/*.sol\"",
+    "test:sol": "node_modules/.bin/truffle test",
+    "coverage": "node_modules/.bin/truffle run coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rotcivegaf/BSC-Escrow.git"
+  },
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "smart",
+    "contracts"
+  ],
+  "author": "rotcivegaf",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rotcivegaf/BSC-Escrow/issues"
+  },
+  "homepage": "https://github.com/rotcivegaf/BSC-Escrow#readme",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^3.4.0",
+    "bn-chai": "^1.0.1",
+    "chai": "^4.2.0",
+    "eslint": "^7.15.0",
+    "eslint-config-standard": "^10.2.1",
+    "eslint-plugin-import": "^2.13.0",
+    "eslint-plugin-node": "^5.2.1",
+    "eslint-plugin-promise": "^3.8.0",
+    "eslint-plugin-standard": "^3.1.0",
+    "solhint": "^3.2.0",
+    "solidity-coverage": "^0.7.10",
+    "truffle": "^5.1.42"
+  }
+}
