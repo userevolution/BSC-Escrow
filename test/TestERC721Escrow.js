@@ -258,7 +258,7 @@ contract('ERC721Escrow', (accounts) => {
       const salt = random32bn();
       const tokenId = random32bn();
       const toAgent = bn(1);
-      const id = await calcId(agent, depositant, beneficiary, erc721.address, tokenId,  erc20.address, toAgent, salt);
+      const id = await calcId(agent, depositant, beneficiary, erc721.address, tokenId, erc20.address, toAgent, salt);
 
       const agentSignature = await web3.eth.sign(id, agent);
 
