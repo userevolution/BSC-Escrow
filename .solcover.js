@@ -1,5 +1,5 @@
 module.exports = {
-    skipFiles: [
-        'contracts/test_utils',
-    ]
+  skipFiles: [
+    'test_utils',
+  ]
 }
