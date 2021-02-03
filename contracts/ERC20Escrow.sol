@@ -326,13 +326,17 @@ contract ERC20Escrow {
         // Actualize escrow balance in storage
         escrow.balance = escrow.balance.sub(_amount);
         // Send fee to the agent
-        escrow.token.safeTransfer(escrow.agent, toAgent);
-        // Substract the agent fee
-        uint256 toAmount = _amount.sub(toAgent);
-        // Send amount to the _to
-        escrow.token.safeTransfer(_to, toAmount);
+        if (toAgent != 0) {
+            escrow.token.safeTransfer(escrow.agent, toAgent);
+            // Substract the agent fee
+            _amount = _amount.sub(toAgent);
+        }
 
-        emit Withdraw(_escrowId, msg.sender, _to, toAmount, toAgent);
+
+        // Send amount to the _to
+        escrow.token.safeTransfer(_to, _amount);
+
+        emit Withdraw(_escrowId, msg.sender, _to, _amount, toAgent);
     }
 
     /**
