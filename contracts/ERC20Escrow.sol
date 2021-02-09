@@ -2,8 +2,10 @@ pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/IERC20Agent.sol";
 
 
 /**
@@ -13,6 +15,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract ERC20Escrow {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
+    using Address for address;
 
     // Events
 
@@ -65,12 +68,12 @@ contract ERC20Escrow {
     /**
         @notice Calculate the escrow id
 
-        @dev The id of the escrow its generate with keccak256 function using the parameters of the function
+        @dev The id of the escrow is generated with the keccak256 function using the parameters of the function
 
         @param _agent The agent address
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
-        @param _agentFee The fee percentage(calculate in BASE), this fee will sent to the agent when the escrow is withdrawn
+        @param _agentFee The fee percentage(calculate in BASE), this fee will be sent to the agent when the escrow is withdrawn
         @param _token The token address
         @param _salt An entropy value, used to generate the id
 
@@ -106,30 +109,44 @@ contract ERC20Escrow {
                 50.00% is 5000
                 23.45% is 2345
 
-        @dev The id of the escrow its generate with keccak256 function,
+        @dev The id of the escrow is generated with keccak256 function,
             using the address of this contract, the sender(agent), the _depositant,
             the _beneficiary, the _agentFee, the _token and the salt number
 
-            The agent will be the sender of the transaction
-            The _agentFee should be low or equal than 1000(10%)
+            If the agent is not a contact, it will be the sender of the transaction and the escrow calls the create function of agent contract
+            The _agentFee should below or equal to 1000(10%)
 
+        @param _agent The agent address
         @param _depositant The depositant address
-        @param _beneficiary The retrea    der address
-        @param _agentFee The fee percentage(calculate in BASE), this fee will sent to the agent when the escrow is withdrawn
+        @param _beneficiary The beneficiary address
+        @param _agentFee The fee percentage(calculate in BASE), this fee will be sent to the agent when the escrow is withdrawn
         @param _token The token address
         @param _salt An entropy value, used to generate the id
+        @param _agentData Data uses by agent contract to execute the create function
 
         @return escrowId The id of the escrow
     */
     function createEscrow(
+        address _agent,
         address _depositant,
         address _beneficiary,
         uint256 _agentFee,
         IERC20 _token,
-        uint256 _salt
+        uint256 _salt,
+        bytes calldata _agentData
     ) external returns(bytes32 escrowId) {
+        if (_agent != msg.sender)
+            require(IERC20Agent(_agent).create(
+                _depositant,
+                _beneficiary,
+                _agentFee,
+                _token,
+                _salt,
+                _agentData
+            ), "createEscrow: The agent rejects the create");
+
         escrowId = _createEscrow(
-            msg.sender,
+            _agent,
             _depositant,
             _beneficiary,
             _agentFee,
@@ -141,12 +158,12 @@ contract ERC20Escrow {
     /**
         @notice Create an escrow, using the signature provided by the agent
 
-        @dev The signature can will be cancel with cancelSignature function
+        @dev The signature can be canceled with cancelSignature function
 
         @param _agent The agent address
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
-        @param _agentFee The fee percentage(calculate in BASE), this fee will sent to the agent when the escrow is withdrawn
+        @param _agentFee The fee percentage(calculate in BASE), this fee will be sent to the agent when the escrow is withdrawn
         @param _token The token address
         @param _salt An entropy value, used to generate the id
         @param _agentSignature The signature provided by the agent
@@ -195,7 +212,7 @@ contract ERC20Escrow {
     /**
         @notice Deposit an amount valuate in escrow token to an escrow
 
-        @dev The depositant of the escrow should be the sender, previous need the approve of the ERC20 tokens
+        @dev The depositant of the escrow should be the sender, previous need the approval of the ERC20 tokens
 
         @param _escrowId The id of the escrow
         @param _amount The amount to deposit in an escrow
@@ -219,10 +236,11 @@ contract ERC20Escrow {
 
         @param _escrowId The id of the escrow
         @param _amount The base amount
+        @param _agentData Data uses by agent contract to execute withdraw function
     */
-    function withdrawToBeneficiary(bytes32 _escrowId, uint256 _amount) external {
+    function withdrawToBeneficiary(bytes32 _escrowId, uint256 _amount, bytes calldata _agentData) external {
         Escrow storage escrow = escrows[_escrowId];
-        _withdraw(_escrowId, escrow.depositant, escrow.beneficiary, _amount);
+        _withdraw(_escrowId, escrow.depositant, escrow.beneficiary, _amount, _agentData);
     }
 
     /**
@@ -232,23 +250,34 @@ contract ERC20Escrow {
 
         @param _escrowId The id of the escrow
         @param _amount The base amount
+        @param _agentData Data uses by agent contract to execute withdraw function
     */
-    function withdrawToDepositant(bytes32 _escrowId, uint256 _amount) external {
+    function withdrawToDepositant(bytes32 _escrowId, uint256 _amount, bytes calldata _agentData) external {
         Escrow storage escrow = escrows[_escrowId];
-        _withdraw(_escrowId, escrow.beneficiary, escrow.depositant, _amount);
+        _withdraw(_escrowId, escrow.beneficiary, escrow.depositant, _amount, _agentData);
     }
 
     /**
         @notice Cancel an escrow and send the balance of the escrow to the depositant address
 
-        @dev The sender should be the agent of the escrow
+        @dev If the agent is a contract, the escrow contract call cancel function of the agent
+            else the sender should be the agent of the escrow
             The escrow will deleted
 
         @param _escrowId The id of the escrow
+        @param _agentData Data uses by agent contract to execute cancel function
     */
-    function cancel(bytes32 _escrowId) external {
+    function cancel(bytes32 _escrowId, bytes calldata _agentData) external {
         Escrow storage escrow = escrows[_escrowId];
-        require(msg.sender == escrow.agent, "cancel: The sender should be the agent");
+
+        if (escrow.agent.isContract()) {
+            require(IERC20Agent(escrow.agent).cancel(
+                _escrowId,
+                _agentData
+            ), "cancel: The agent rejects the cancel");
+        } else {
+            require(msg.sender == escrow.agent, "cancel: The sender should be the agent");
+        }
 
         uint256 balance = escrow.balance;
         address depositant = escrow.depositant;
@@ -311,18 +340,33 @@ contract ERC20Escrow {
         @param _approved The address of approved
         @param _to The address of gone the tokens
         @param _amount The base amount
+        @param _agentData Data uses by agent contract to execute withdraw function
     */
     function _withdraw(
         bytes32 _escrowId,
         address _approved,
         address _to,
-        uint256 _amount
+        uint256 _amount,
+        bytes calldata _agentData
     ) internal {
         Escrow storage escrow = escrows[_escrowId];
-        require(msg.sender == _approved || msg.sender == escrow.agent, "_withdraw: The sender should be the _approved or the agent");
+
+        if (msg.sender != _approved) {
+            if (escrow.agent.isContract()) {
+                require(IERC20Agent(escrow.agent).withdraw(
+                    _escrowId,
+                    _approved,
+                    _to,
+                    _amount,
+                    _agentData
+                ), "_withdraw: The agent rejects the withdraw");
+            } else {
+              require(msg.sender == escrow.agent, "_withdraw: The sender should be the _approved or the agent");
+            }
+        }
 
         // Calculate the fee amount
-        uint256 toAgent = _feeAmount(_amount, escrow.agentFee);
+        uint256 toAgent = _amount.mul(escrow.agentFee) / BASE;
         // Actualize escrow balance in storage
         escrow.balance = escrow.balance.sub(_amount);
         // Send fee to the agent
@@ -337,23 +381,6 @@ contract ERC20Escrow {
         escrow.token.safeTransfer(_to, _amount);
 
         emit Withdraw(_escrowId, msg.sender, _to, _amount, toAgent);
-    }
-
-    /**
-        @notice Calculate the fee amount
-
-        @dev Formula: _amount * _fee / BASE
-
-        @param _amount The base amount
-        @param _fee The fee
-
-        @return The calculate fee
-    */
-    function _feeAmount(
-        uint256 _amount,
-        uint256 _fee
-    ) internal view returns(uint256) {
-        return _amount.mul(_fee) / BASE;
     }
 
     function _ecrecovery(bytes32 _hash, bytes memory _sig) internal pure returns (address) {
