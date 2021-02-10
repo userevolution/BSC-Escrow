@@ -1,4 +1,5 @@
 const TestToken = artifacts.require('TestToken');
+const TestERC721Agent = artifacts.require('TestERC721Agent');
 const TestERC721Token = artifacts.require('TestERC721Token');
 
 const ERC721Escrow = artifacts.require('ERC721Escrow');
@@ -23,6 +24,7 @@ contract('ERC721Escrow', (accounts) => {
   let erc721Escrow;
   let erc721;
   let erc20;
+  let erc721Agent;
 
   let salt = 0;
   let basicEscrow;
@@ -67,11 +69,12 @@ contract('ERC721Escrow', (accounts) => {
     return id;
   }
 
-  async function createBasicEscrow () {
+  async function createBasicEscrow (agent = basicEscrow.agent) {
     basicEscrow.salt = ++salt;
     basicEscrow.tokenId = basicEscrow.salt;
 
     await erc721Escrow.createEscrow(
+      agent,
       basicEscrow.depositant,
       basicEscrow.beneficiary,
       basicEscrow.token721,
@@ -79,10 +82,11 @@ contract('ERC721Escrow', (accounts) => {
       basicEscrow.token20,
       basicEscrow.toAgent,
       basicEscrow.salt,
+      basicEscrow.agentData,
       { from: basicEscrow.agent },
     );
 
-    return calcId(basicEscrow.agent, basicEscrow.depositant, basicEscrow.beneficiary, basicEscrow.token721, basicEscrow.tokenId, basicEscrow.token20, basicEscrow.toAgent, basicEscrow.salt);
+    return calcId(agent, basicEscrow.depositant, basicEscrow.beneficiary, basicEscrow.token721, basicEscrow.tokenId, basicEscrow.token20, basicEscrow.toAgent, basicEscrow.salt);
   }
 
   async function deposit (escrowId) {
@@ -100,6 +104,8 @@ contract('ERC721Escrow', (accounts) => {
     erc20 = await TestToken.new({ from: owner });
     erc721 = await TestERC721Token.new({ from: owner });
 
+    erc721Agent = await TestERC721Agent.new({ from: owner });
+
     basicEscrow = {
       agent: agent,
       depositant: depositant,
@@ -109,6 +115,7 @@ contract('ERC721Escrow', (accounts) => {
       token20: erc20.address,
       toAgent: bn(1),
       salt: salt,
+      agentData: '0x01',
     };
   });
 
@@ -119,13 +126,14 @@ contract('ERC721Escrow', (accounts) => {
           random32(),
           { from: agent },
         ),
-        'deposit: The sender should be the depositant',
+        '',
       );
     });
     it('Try withdraw to beneficiary of non-exists escrow', async () => {
       await tryCatchRevert(
         () => erc721Escrow.withdrawToBeneficiary(
           random32(),
+          [],
           { from: agent },
         ),
         '_withdraw: The sender should be the _approved or the agent',
@@ -135,6 +143,7 @@ contract('ERC721Escrow', (accounts) => {
       await tryCatchRevert(
         () => erc721Escrow.withdrawToDepositant(
           random32(),
+          [],
           { from: agent },
         ),
         '_withdraw: The sender should be the _approved or the agent',
@@ -144,6 +153,7 @@ contract('ERC721Escrow', (accounts) => {
       await tryCatchRevert(
         () => erc721Escrow.cancel(
           random32(),
+          [],
           { from: agent },
         ),
         'cancel: The sender should be the agent',
@@ -151,7 +161,7 @@ contract('ERC721Escrow', (accounts) => {
     });
   });
   describe('Function createEscrow', function () {
-    it('create basic escrow', async () => {
+    it('Create basic escrow', async () => {
       const salt = random32bn();
       const tokenId = random32bn();
       const toAgent = bn(1);
@@ -159,6 +169,7 @@ contract('ERC721Escrow', (accounts) => {
 
       const CreateEscrow = await toEvents(
         erc721Escrow.createEscrow(
+          agent,
           depositant,
           beneficiary,
           erc721.address,
@@ -166,6 +177,7 @@ contract('ERC721Escrow', (accounts) => {
           erc20.address,
           toAgent,
           salt,
+          [],
           { from: agent },
         ),
         'CreateEscrow',
@@ -180,6 +192,7 @@ contract('ERC721Escrow', (accounts) => {
       assert.equal(CreateEscrow._token20, erc20.address);
       expect(CreateEscrow._toAgent).to.eq.BN(toAgent);
       expect(CreateEscrow._salt).to.eq.BN(salt);
+      assert.equal(CreateEscrow._agentData, null);
 
       const escrow = await erc721Escrow.escrows(id);
       assert.equal(escrow.agent, agent);
@@ -190,11 +203,71 @@ contract('ERC721Escrow', (accounts) => {
       assert.equal(escrow.token20, erc20.address);
       expect(escrow.toAgent).to.eq.BN(toAgent);
     });
+    it('Create a basic escrow with a contract agent as agent', async () => {
+      const salt = random32bn();
+      const tokenId = random32bn();
+      const toAgent = bn(1);
+      const id = await calcId(erc721Agent.address, depositant, beneficiary, erc721.address, tokenId, erc20.address, toAgent, salt);
+
+      const CreateEscrow = await toEvents(
+        erc721Escrow.createEscrow(
+          erc721Agent.address,
+          depositant,
+          beneficiary,
+          erc721.address,
+          tokenId,
+          erc20.address,
+          toAgent,
+          salt,
+          '0x01',
+          { from: owner },
+        ),
+        'CreateEscrow',
+      );
+
+      assert.equal(CreateEscrow._escrowId, id);
+      assert.equal(CreateEscrow._agent, erc721Agent.address);
+      assert.equal(CreateEscrow._depositant, depositant);
+      assert.equal(CreateEscrow._beneficiary, beneficiary);
+      assert.equal(CreateEscrow._token721, erc721.address);
+      expect(CreateEscrow._tokenId).to.eq.BN(tokenId);
+      assert.equal(CreateEscrow._token20, erc20.address);
+      expect(CreateEscrow._toAgent).to.eq.BN(toAgent);
+      expect(CreateEscrow._salt).to.eq.BN(salt);
+      assert.equal(CreateEscrow._agentData, '0x01');
+
+      const escrow = await erc721Escrow.escrows(id);
+      assert.equal(escrow.agent, erc721Agent.address);
+      assert.equal(escrow.depositant, depositant);
+      assert.equal(escrow.beneficiary, beneficiary);
+      assert.equal(escrow.token721, erc721.address);
+      expect(escrow.tokenId).to.eq.BN(tokenId);
+      assert.equal(escrow.token20, erc20.address);
+      expect(escrow.toAgent).to.eq.BN(toAgent);
+    });
+    it('Try create an escrow and the contract agent rejects', async () => {
+      await tryCatchRevert(
+        () => erc721Escrow.createEscrow(
+          erc721Agent.address,
+          depositant,
+          beneficiary,
+          erc721.address,
+          random32bn(),
+          erc20.address,
+          0,
+          random32bn(),
+          [],
+          { from: owner },
+        ),
+        'createEscrow: The agent rejects the create',
+      );
+    });
     it('Try create two escrows with the same id', async function () {
       const escrowId = await createBasicEscrow();
 
       await tryCatchRevert(
         () => erc721Escrow.createEscrow(
+          basicEscrow.agent,
           basicEscrow.depositant,
           basicEscrow.beneficiary,
           basicEscrow.token721,
@@ -202,6 +275,7 @@ contract('ERC721Escrow', (accounts) => {
           basicEscrow.token20,
           basicEscrow.toAgent,
           basicEscrow.salt,
+          basicEscrow.agentData,
           { from: basicEscrow.agent },
         ),
         'createEscrow: The escrow exists',
@@ -235,7 +309,7 @@ contract('ERC721Escrow', (accounts) => {
 
       const agentSignature = await web3.eth.sign(id, agent);
 
-      const SignCreateEscrow = await toEvents(
+      const events = await toEvents(
         erc721Escrow.signCreateEscrow(
           agent,
           depositant,
@@ -248,9 +322,23 @@ contract('ERC721Escrow', (accounts) => {
           agentSignature,
           { from: creator },
         ),
+        'CreateEscrow',
         'SignCreateEscrow',
       );
 
+      const CreateEscrow = events[0];
+      assert.equal(CreateEscrow._escrowId, id);
+      assert.equal(CreateEscrow._agent, agent);
+      assert.equal(CreateEscrow._depositant, depositant);
+      assert.equal(CreateEscrow._beneficiary, beneficiary);
+      assert.equal(CreateEscrow._token721, erc721.address);
+      expect(CreateEscrow._tokenId).to.eq.BN(tokenId);
+      assert.equal(CreateEscrow._token20, erc20.address);
+      expect(CreateEscrow._toAgent).to.eq.BN(toAgent);
+      expect(CreateEscrow._salt).to.eq.BN(salt);
+      assert.equal(CreateEscrow._agentData, null);
+
+      const SignCreateEscrow = events[1];
       assert.equal(SignCreateEscrow._escrowId, id);
       assert.equal(SignCreateEscrow._agentSignature, agentSignature);
     });
@@ -277,6 +365,7 @@ contract('ERC721Escrow', (accounts) => {
 
       await tryCatchRevert(
         () => erc721Escrow.createEscrow(
+          agent,
           depositant,
           beneficiary,
           erc721.address,
@@ -284,6 +373,7 @@ contract('ERC721Escrow', (accounts) => {
           erc20.address,
           toAgent,
           salt,
+          [],
           { from: agent },
         ),
         'createEscrow: The escrow exists',
@@ -445,17 +535,6 @@ contract('ERC721Escrow', (accounts) => {
 
       assert.equal(await erc721.ownerOf(basicEscrow.tokenId), erc721Escrow.address);
     });
-    it('Try deposit in an escrow without be the depositant', async () => {
-      const escrowId = await createBasicEscrow();
-
-      await tryCatchRevert(
-        () => erc721Escrow.deposit(
-          escrowId,
-          { from: creator },
-        ),
-        'deposit: The sender should be the depositant',
-      );
-    });
   });
   describe('Function withdrawToBeneficiary', function () {
     it('Withdraw to beneficiary an escrow from depositant', async () => {
@@ -468,6 +547,7 @@ contract('ERC721Escrow', (accounts) => {
       const Withdraw = await toEvents(
         erc721Escrow.withdrawToBeneficiary(
           escrowId,
+          [],
           { from: depositant },
         ),
         'Withdraw',
@@ -501,6 +581,7 @@ contract('ERC721Escrow', (accounts) => {
       const Withdraw = await toEvents(
         erc721Escrow.withdrawToBeneficiary(
           escrowId,
+          [],
           { from: agent },
         ),
         'Withdraw',
@@ -524,12 +605,93 @@ contract('ERC721Escrow', (accounts) => {
 
       assert.equal(await erc721.ownerOf(basicEscrow.tokenId), escrow.beneficiary);
     });
+    it('Withdraw to beneficiary an escrow with a contract agent as agent from depositant', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+      await deposit(escrowId);
+
+      const prevBalEscrow = await erc20.balanceOf(erc721Escrow.address);
+      const prevBalAgent = await erc20.balanceOf(erc721Agent.address);
+
+      const Withdraw = await toEvents(
+        erc721Escrow.withdrawToBeneficiary(
+          escrowId,
+          [],
+          { from: depositant },
+        ),
+        'Withdraw',
+      );
+
+      assert.equal(Withdraw._escrowId, escrowId);
+      assert.equal(Withdraw._sender, depositant);
+      assert.equal(Withdraw._to, beneficiary);
+
+      const escrow = await erc721Escrow.escrows(escrowId);
+      assert.equal(escrow.agent, erc721Agent.address);
+      assert.equal(escrow.depositant, depositant);
+      assert.equal(escrow.beneficiary, beneficiary);
+      assert.equal(escrow.token721, erc721.address);
+      expect(escrow.tokenId).to.eq.BN(basicEscrow.tokenId);
+      assert.equal(escrow.token20, erc20.address);
+      expect(escrow.toAgent).to.eq.BN(basicEscrow.toAgent);
+
+      expect(await erc20.balanceOf(erc721Escrow.address)).to.eq.BN(prevBalEscrow.sub(basicEscrow.toAgent));
+      expect(await erc20.balanceOf(erc721Agent.address)).to.eq.BN(prevBalAgent.add(basicEscrow.toAgent));
+
+      assert.equal(await erc721.ownerOf(basicEscrow.tokenId), escrow.beneficiary);
+    });
+    it('Withdraw to beneficiary an escrow with a contract agent as agent from agent', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+      await deposit(escrowId);
+
+      const prevBalEscrow = await erc20.balanceOf(erc721Escrow.address);
+      const prevBalAgent = await erc20.balanceOf(erc721Agent.address);
+
+      const Withdraw = await toEvents(
+        erc721Escrow.withdrawToBeneficiary(
+          escrowId,
+          '0x01',
+          { from: owner },
+        ),
+        'Withdraw',
+      );
+
+      assert.equal(Withdraw._escrowId, escrowId);
+      assert.equal(Withdraw._sender, owner);
+      assert.equal(Withdraw._to, beneficiary);
+
+      const escrow = await erc721Escrow.escrows(escrowId);
+      assert.equal(escrow.agent, erc721Agent.address);
+      assert.equal(escrow.depositant, depositant);
+      assert.equal(escrow.beneficiary, beneficiary);
+      assert.equal(escrow.token721, erc721.address);
+      expect(escrow.tokenId).to.eq.BN(basicEscrow.tokenId);
+      assert.equal(escrow.token20, erc20.address);
+      expect(escrow.toAgent).to.eq.BN(basicEscrow.toAgent);
+
+      expect(await erc20.balanceOf(erc721Escrow.address)).to.eq.BN(prevBalEscrow.sub(basicEscrow.toAgent));
+      expect(await erc20.balanceOf(erc721Agent.address)).to.eq.BN(prevBalAgent.add(basicEscrow.toAgent));
+
+      assert.equal(await erc721.ownerOf(basicEscrow.tokenId), escrow.beneficiary);
+    });
+    it('Try withdraw to beneficiary an escrow and the contract agent rejects', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+
+      await tryCatchRevert(
+        () => erc721Escrow.withdrawToBeneficiary(
+          escrowId,
+          [],
+          { from: owner },
+        ),
+        '_withdraw: The agent rejects the withdraw',
+      );
+    });
     it('Try withdraw to beneficiary without be the depositant or the agent', async () => {
       const escrowId = await createBasicEscrow();
 
       await tryCatchRevert(
         () => erc721Escrow.withdrawToBeneficiary(
           escrowId,
+          [],
           { from: beneficiary },
         ),
         '_withdraw: The sender should be the _approved or the agent',
@@ -538,6 +700,7 @@ contract('ERC721Escrow', (accounts) => {
       await tryCatchRevert(
         () => erc721Escrow.withdrawToBeneficiary(
           escrowId,
+          [],
           { from: creator },
         ),
         '_withdraw: The sender should be the _approved or the agent',
@@ -555,6 +718,7 @@ contract('ERC721Escrow', (accounts) => {
       const Withdraw = await toEvents(
         erc721Escrow.withdrawToDepositant(
           escrowId,
+          [],
           { from: beneficiary },
         ),
         'Withdraw',
@@ -588,6 +752,7 @@ contract('ERC721Escrow', (accounts) => {
       const Withdraw = await toEvents(
         erc721Escrow.withdrawToDepositant(
           escrowId,
+          [],
           { from: agent },
         ),
         'Withdraw',
@@ -611,12 +776,93 @@ contract('ERC721Escrow', (accounts) => {
 
       assert.equal(await erc721.ownerOf(basicEscrow.tokenId), escrow.depositant);
     });
+    it('Withdraw to depositant an escrow with a contract agent as agent from beneficiary', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+      await deposit(escrowId);
+
+      const prevBalEscrow = await erc20.balanceOf(erc721Escrow.address);
+      const prevBalAgent = await erc20.balanceOf(erc721Agent.address);
+
+      const Withdraw = await toEvents(
+        erc721Escrow.withdrawToDepositant(
+          escrowId,
+          [],
+          { from: beneficiary },
+        ),
+        'Withdraw',
+      );
+
+      assert.equal(Withdraw._escrowId, escrowId);
+      assert.equal(Withdraw._sender, beneficiary);
+      assert.equal(Withdraw._to, depositant);
+
+      const escrow = await erc721Escrow.escrows(escrowId);
+      assert.equal(escrow.agent, erc721Agent.address);
+      assert.equal(escrow.depositant, depositant);
+      assert.equal(escrow.beneficiary, beneficiary);
+      assert.equal(escrow.token721, erc721.address);
+      expect(escrow.tokenId).to.eq.BN(basicEscrow.tokenId);
+      assert.equal(escrow.token20, erc20.address);
+      expect(escrow.toAgent).to.eq.BN(basicEscrow.toAgent);
+
+      expect(await erc20.balanceOf(erc721Escrow.address)).to.eq.BN(prevBalEscrow.sub(basicEscrow.toAgent));
+      expect(await erc20.balanceOf(erc721Agent.address)).to.eq.BN(prevBalAgent.add(basicEscrow.toAgent));
+
+      assert.equal(await erc721.ownerOf(basicEscrow.tokenId), escrow.depositant);
+    });
+    it('Withdraw to depositant an escrow with a contract agent as agent from agent', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+      await deposit(escrowId);
+
+      const prevBalEscrow = await erc20.balanceOf(erc721Escrow.address);
+      const prevBalAgent = await erc20.balanceOf(erc721Agent.address);
+
+      const Withdraw = await toEvents(
+        erc721Escrow.withdrawToDepositant(
+          escrowId,
+          '0x01',
+          { from: owner },
+        ),
+        'Withdraw',
+      );
+
+      assert.equal(Withdraw._escrowId, escrowId);
+      assert.equal(Withdraw._sender, owner);
+      assert.equal(Withdraw._to, depositant);
+
+      const escrow = await erc721Escrow.escrows(escrowId);
+      assert.equal(escrow.agent, erc721Agent.address);
+      assert.equal(escrow.depositant, depositant);
+      assert.equal(escrow.beneficiary, beneficiary);
+      assert.equal(escrow.token721, erc721.address);
+      expect(escrow.tokenId).to.eq.BN(basicEscrow.tokenId);
+      assert.equal(escrow.token20, erc20.address);
+      expect(escrow.toAgent).to.eq.BN(basicEscrow.toAgent);
+
+      expect(await erc20.balanceOf(erc721Escrow.address)).to.eq.BN(prevBalEscrow.sub(basicEscrow.toAgent));
+      expect(await erc20.balanceOf(erc721Agent.address)).to.eq.BN(prevBalAgent.add(basicEscrow.toAgent));
+
+      assert.equal(await erc721.ownerOf(basicEscrow.tokenId), escrow.depositant);
+    });
+    it('Try withdraw to beneficiary an escrow and the contract agent rejects', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+
+      await tryCatchRevert(
+        () => erc721Escrow.withdrawToDepositant(
+          escrowId,
+          [],
+          { from: owner },
+        ),
+        '_withdraw: The agent rejects the withdraw',
+      );
+    });
     it('Try withdraw to depositant without be the beneficiary or the agent', async () => {
       const escrowId = await createBasicEscrow();
 
       await tryCatchRevert(
         () => erc721Escrow.withdrawToDepositant(
           escrowId,
+          [],
           { from: depositant },
         ),
         '_withdraw: The sender should be the _approved or the agent',
@@ -625,6 +871,7 @@ contract('ERC721Escrow', (accounts) => {
       await tryCatchRevert(
         () => erc721Escrow.withdrawToDepositant(
           escrowId,
+          [],
           { from: creator },
         ),
         '_withdraw: The sender should be the _approved or the agent',
@@ -643,6 +890,7 @@ contract('ERC721Escrow', (accounts) => {
       const Cancel = await toEvents(
         erc721Escrow.cancel(
           escrowId,
+          [],
           { from: agent },
         ),
         'Cancel',
@@ -666,12 +914,60 @@ contract('ERC721Escrow', (accounts) => {
 
       assert.equal(await erc721.ownerOf(basicEscrow.tokenId), depositant);
     });
+    it('Cancel an escrow with a contract agent as agent', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+      await deposit(escrowId);
+
+      const prevBalDepositant = await erc20.balanceOf(depositant);
+      const prevBalEscrow = await erc20.balanceOf(erc721Escrow.address);
+      const prevBalAgent = await erc20.balanceOf(agent);
+
+      const Cancel = await toEvents(
+        erc721Escrow.cancel(
+          escrowId,
+          '0x01',
+          { from: agent },
+        ),
+        'Cancel',
+      );
+
+      assert.equal(Cancel._escrowId, escrowId);
+
+      const escrow = await erc721Escrow.escrows(escrowId);
+      assert.equal(escrow.depositant, address0x);
+      assert.equal(escrow.beneficiary, address0x);
+      assert.equal(escrow.agent, address0x);
+      expect(escrow.fee).to.eq.BN(0);
+      assert.equal(escrow.token721, address0x);
+      expect(escrow.tokenId).to.eq.BN(0);
+      assert.equal(escrow.token20, address0x);
+      expect(escrow.toAgent).to.eq.BN(0);
+
+      expect(await erc20.balanceOf(agent)).to.eq.BN(prevBalAgent);
+      expect(await erc20.balanceOf(erc721Escrow.address)).to.eq.BN(prevBalEscrow.sub(basicEscrow.toAgent));
+      expect(await erc20.balanceOf(depositant)).to.eq.BN(prevBalDepositant.add(basicEscrow.toAgent));
+
+      assert.equal(await erc721.ownerOf(basicEscrow.tokenId), depositant);
+    });
+    it('Try cancel an escrow and the contract agent rejects', async () => {
+      const escrowId = await createBasicEscrow(erc721Agent.address);
+
+      await tryCatchRevert(
+        () => erc721Escrow.cancel(
+          escrowId,
+          [],
+          { from: depositant },
+        ),
+        'cancel: The agent rejects the cancel',
+      );
+    });
     it('Try cancel without be the agent', async () => {
       const escrowId = await createBasicEscrow();
 
       await tryCatchRevert(
         () => erc721Escrow.cancel(
           escrowId,
+          [],
           { from: depositant },
         ),
         'cancel: The sender should be the agent',

@@ -26,7 +26,8 @@ contract ERC20Escrow {
         address _beneficiary,
         uint256 _agentFee,
         IERC20 _token,
-        uint256 _salt
+        uint256 _salt,
+        bytes _agentData
     );
 
     event SignCreateEscrow(bytes32 _escrowId, bytes _agentSignature);
@@ -153,6 +154,8 @@ contract ERC20Escrow {
             _token,
             _salt
         );
+
+        emit CreateEscrow(escrowId, _agent, _depositant, _beneficiary, _agentFee, _token, _salt, _agentData);
     }
 
     /**
@@ -195,6 +198,8 @@ contract ERC20Escrow {
             "signCreateEscrow: Invalid agent signature"
         );
 
+        emit CreateEscrow(escrowId, _agent, _depositant, _beneficiary, _agentFee, _token, _salt, "");
+
         emit SignCreateEscrow(escrowId, _agentSignature);
     }
 
@@ -219,7 +224,6 @@ contract ERC20Escrow {
     */
     function deposit(bytes32 _escrowId, uint256 _amount) external {
         Escrow storage escrow = escrows[_escrowId];
-        require(msg.sender == escrow.depositant, "deposit: The sender should be the depositant");
 
         // Transfer the tokens
         escrow.token.safeTransferFrom(msg.sender, address(this), _amount);
@@ -327,8 +331,6 @@ contract ERC20Escrow {
             token: _token,
             balance: 0
         });
-
-        emit CreateEscrow(escrowId, _agent, _depositant, _beneficiary, _agentFee, _token, _salt);
     }
 
     /**

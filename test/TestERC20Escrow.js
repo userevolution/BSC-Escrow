@@ -93,7 +93,7 @@ contract('ERC20Escrow', (accounts) => {
       basicEscrow.agentFee,
       basicEscrow.token,
       basicEscrow.salt,
-      '0x01',
+      basicEscrow.agentData,
       { from: basicEscrow.agent },
     );
 
@@ -123,6 +123,7 @@ contract('ERC20Escrow', (accounts) => {
       agentFee: 500,
       token: erc20.address,
       salt: salt,
+      agentData: '0x01',
     };
   });
 
@@ -134,7 +135,7 @@ contract('ERC20Escrow', (accounts) => {
           0,
           { from: agent },
         ),
-        'deposit: The sender should be the depositant',
+        'Address: call to non-contract.',
       );
     });
     it('Try withdraw to beneficiary of non-exists escrow', async () => {
@@ -196,6 +197,7 @@ contract('ERC20Escrow', (accounts) => {
       expect(CreateEscrow._agentFee).to.eq.BN(0);
       assert.equal(CreateEscrow._token, erc20.address);
       expect(CreateEscrow._salt).to.eq.BN(salt);
+      assert.equal(CreateEscrow._agentData, null);
 
       const escrow = await erc20Escrow.escrows(id);
       assert.equal(escrow.agent, agent);
@@ -230,6 +232,7 @@ contract('ERC20Escrow', (accounts) => {
       expect(CreateEscrow._agentFee).to.eq.BN(0);
       assert.equal(CreateEscrow._token, erc20.address);
       expect(CreateEscrow._salt).to.eq.BN(salt);
+      assert.equal(CreateEscrow._agentData, '0x01');
 
       const escrow = await erc20Escrow.escrows(id);
       assert.equal(escrow.agent, erc20Agent.address);
@@ -265,7 +268,7 @@ contract('ERC20Escrow', (accounts) => {
           basicEscrow.agentFee,
           basicEscrow.token,
           basicEscrow.salt,
-          [],
+          basicEscrow.agentData,
           { from: basicEscrow.agent },
         ),
         'createEscrow: The escrow exists',
@@ -323,7 +326,7 @@ contract('ERC20Escrow', (accounts) => {
 
       const agentSignature = await web3.eth.sign(id, agent);
 
-      const SignCreateEscrow = await toEvents(
+      const events = await toEvents(
         erc20Escrow.signCreateEscrow(
           agent,
           depositant,
@@ -334,9 +337,21 @@ contract('ERC20Escrow', (accounts) => {
           agentSignature,
           { from: creator },
         ),
+        'CreateEscrow',
         'SignCreateEscrow',
       );
 
+      const CreateEscrow = events[0];
+      assert.equal(CreateEscrow._escrowId, id);
+      assert.equal(CreateEscrow._agent, agent);
+      assert.equal(CreateEscrow._depositant, depositant);
+      assert.equal(CreateEscrow._beneficiary, beneficiary);
+      expect(CreateEscrow._agentFee).to.eq.BN(0);
+      assert.equal(CreateEscrow._token, erc20.address);
+      expect(CreateEscrow._salt).to.eq.BN(salt);
+      assert.equal(CreateEscrow._agentData, null);
+
+      const SignCreateEscrow = events[1];
       assert.equal(SignCreateEscrow._escrowId, id);
       assert.equal(SignCreateEscrow._agentSignature, agentSignature);
     });
@@ -590,18 +605,6 @@ contract('ERC20Escrow', (accounts) => {
       expect(escrow.balance).to.eq.BN(prevBalEscrow.add(amount));
       expect(await erc20.balanceOf(erc20Escrow.address)).to.eq.BN(prevBalERC20Escrow.add(amount));
     });
-    it('Try deposit in an escrow without be the depositant', async () => {
-      const escrowId = await createBasicEscrow();
-
-      await tryCatchRevert(
-        () => erc20Escrow.deposit(
-          escrowId,
-          0,
-          { from: creator },
-        ),
-        'deposit: The sender should be the depositant',
-      );
-    });
   });
   describe('Function withdrawToBeneficiary', function () {
     it('Withdraw to beneficiary an escrow from depositant', async () => {
@@ -850,7 +853,7 @@ contract('ERC20Escrow', (accounts) => {
         '_withdraw: The sender should be the _approved or the agent',
       );
     });
-    it('Try withdraw to beneficiary without be the depositant or the agent', async () => {
+    it('Try subtraction overflow', async () => {
       const escrowId = await createBasicEscrow();
 
       await tryCatchRevert(

@@ -1,9 +1,11 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "./interfaces/IERC721Agent.sol";
 
 
 /**
@@ -12,6 +14,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 */
 contract ERC721Escrow {
     using SafeERC20 for IERC20;
+    using Address for address;
 
     // Events
 
@@ -24,7 +27,8 @@ contract ERC721Escrow {
         uint256 _tokenId,
         IERC20  _token20,
         uint256 _toAgent,
-        uint256 _salt
+        uint256 _salt,
+        bytes _agentData
     );
 
     event SignCreateEscrow(bytes32 _escrowId, bytes _agentSignature);
@@ -59,7 +63,7 @@ contract ERC721Escrow {
     /**
         @notice Calculate the escrow id
 
-        @dev The id of the escrow its generate with keccak256 function using the parameters of the function
+        @dev The id of the escrow is generated with keccak256 function using the parameters of the function
 
         @param _agent The agent address
         @param _depositant The depositant address
@@ -102,12 +106,13 @@ contract ERC721Escrow {
     /**
         @notice Create an ERC721 escrow
 
-        @dev The id of the escrow its generate with keccak256 function,
+        @dev The id of the escrow is generated with keccak256 function,
             using the address of this contract, the sender(agent), the _depositant,
             the _beneficiary, the _token721, the _tokenId, the _token20, the _toAgent and the salt number
 
-            The agent will be the sender of the transaction
+            If the agent is not a contact, it will be the sender of the transaction and the escrow calls the create function of the agent contract
 
+        @param _agent The agent address
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _token721 The ERC721 token address
@@ -115,20 +120,35 @@ contract ERC721Escrow {
         @param _token20 The ERC20 token address
         @param _toAgent The amount to pay the agent service
         @param _salt An entropy value, used to generate the id
+        @param _agentData Data uses by agent contract to execute the create function
 
         @return escrowId The id of the escrow
     */
     function createEscrow(
+        address _agent,
         address _depositant,
         address _beneficiary,
         IERC721 _token721,
         uint256 _tokenId,
         IERC20  _token20,
         uint256 _toAgent,
-        uint256 _salt
+        uint256 _salt,
+        bytes calldata _agentData
     ) external returns(bytes32 escrowId) {
+        if (_agent != msg.sender)
+            require(IERC721Agent(_agent).create(
+                _depositant,
+                _beneficiary,
+                _token721,
+                _tokenId,
+                _token20,
+                _toAgent,
+                _salt,
+                _agentData
+            ), "createEscrow: The agent rejects the create");
+
         escrowId = _createEscrow(
-            msg.sender,
+            _agent,
             _depositant,
             _beneficiary,
             _token721,
@@ -137,16 +157,18 @@ contract ERC721Escrow {
             _toAgent,
             _salt
         );
+
+        emit CreateEscrow(escrowId, _agent, _depositant, _beneficiary, _token721, _tokenId, _token20, _toAgent, _salt, _agentData);
     }
 
     /**
         @notice Create an escrow, using the signature provided by the agent
 
-        @dev The signature can will be cancel with cancelSignature function
+        @dev The signature can be canceled with cancelSignature function
 
         @param _agent The agent address
         @param _depositant The depositant address
-        @param _beneficiary The retrea    der address
+        @param _beneficiary The beneficiary address
         @param _token721 The ERC721 token address
         @param _tokenId The ERC721 token id
         @param _token20 The ERC20 token address
@@ -185,6 +207,8 @@ contract ERC721Escrow {
             "signCreateEscrow: Invalid agent signature"
         );
 
+        emit CreateEscrow(escrowId, _agent, _depositant, _beneficiary, _token721, _tokenId, _token20, _toAgent, _salt, "");
+
         emit SignCreateEscrow(escrowId, _agentSignature);
     }
 
@@ -203,13 +227,12 @@ contract ERC721Escrow {
         @notice Deposit an erc721 token in escrow and the agent service charge
 
         @dev The depositant of the escrow should be the sender
-            Previous need the approve of the ERC721 token and the token amount of the agent service charge
+            Previous need the approval of the ERC721 token and the token amount of the agent service charge
 
         @param _escrowId The id of the escrow
     */
     function deposit(bytes32 _escrowId) external {
         Escrow storage escrow = escrows[_escrowId];
-        require(msg.sender == escrow.depositant, "deposit: The sender should be the depositant");
 
         // Transfer the tokens
         if (escrow.toAgent != 0)
@@ -227,10 +250,11 @@ contract ERC721Escrow {
         @dev The sender should be the depositant or the agent of the escrow
 
         @param _escrowId The id of the escrow
+        @param _agentData Data uses by agent contract to execute withdraw function
     */
-    function withdrawToBeneficiary(bytes32 _escrowId) external {
+    function withdrawToBeneficiary(bytes32 _escrowId, bytes calldata _agentData) external {
         Escrow storage escrow = escrows[_escrowId];
-        _withdraw(_escrowId, escrow.depositant, escrow.beneficiary);
+        _withdraw(_escrowId, escrow.depositant, escrow.beneficiary, _agentData);
     }
 
     /**
@@ -239,23 +263,34 @@ contract ERC721Escrow {
         @dev The sender should be the beneficiary or the agent of the escrow
 
         @param _escrowId The id of the escrow
+        @param _agentData Data uses by agent contract to execute withdraw function
     */
-    function withdrawToDepositant(bytes32 _escrowId) external {
+    function withdrawToDepositant(bytes32 _escrowId, bytes calldata _agentData) external {
         Escrow storage escrow = escrows[_escrowId];
-        _withdraw(_escrowId, escrow.beneficiary, escrow.depositant);
+        _withdraw(_escrowId, escrow.beneficiary, escrow.depositant, _agentData);
     }
 
     /**
         @notice Cancel an escrow and send the erc721 token and amount of the agent service charge to the depositant address
 
-        @dev The sender should be the agent of the escrow
-            The escrow will deleted
+        @dev If the agent is a contract, the escrow contract call cancel function of the agent
+            else the sender should be the agent of the escrow
+            The escrow will delete
 
         @param _escrowId The id of the escrow
+        @param _agentData Data uses by agent contract to execute cancel function
     */
-    function cancel(bytes32 _escrowId) external {
+    function cancel(bytes32 _escrowId, bytes calldata _agentData) external {
         Escrow storage escrow = escrows[_escrowId];
-        require(msg.sender == escrow.agent, "cancel: The sender should be the agent");
+
+        if (escrow.agent.isContract()) {
+            require(IERC721Agent(escrow.agent).cancel(
+                _escrowId,
+                _agentData
+            ), "cancel: The agent rejects the cancel");
+        } else {
+            require(msg.sender == escrow.agent, "cancel: The sender should be the agent");
+        }
 
         address depositant = escrow.depositant;
         IERC721 token721 = escrow.token721;
@@ -266,7 +301,7 @@ contract ERC721Escrow {
         // Delete escrow
         delete escrows[_escrowId];
 
-        // Send the tokens to the depositant if the escrow have agent service charge
+        // Send the tokens to the depositant if the escrow have an agent service charge
         if (toAgent != 0)
             token20.safeTransfer(depositant, toAgent);
 
@@ -313,8 +348,6 @@ contract ERC721Escrow {
             token20:     _token20,
             toAgent:     _toAgent
         });
-
-        emit CreateEscrow(escrowId, _agent, _depositant, _beneficiary, _token721, _tokenId, _token20, _toAgent, _salt);
     }
 
     /**
@@ -325,14 +358,28 @@ contract ERC721Escrow {
         @param _escrowId The id of the escrow
         @param _approved The address of approved
         @param _to The address of gone the tokens
+        @param _agentData Data uses by agent contract to execute withdraw function
     */
     function _withdraw(
         bytes32 _escrowId,
         address _approved,
-        address _to
+        address _to,
+        bytes calldata _agentData
     ) internal {
         Escrow storage escrow = escrows[_escrowId];
-        require(msg.sender == _approved || msg.sender == escrow.agent, "_withdraw: The sender should be the _approved or the agent");
+
+        if (msg.sender != _approved) {
+            if (escrow.agent.isContract()) {
+                require(IERC721Agent(escrow.agent).withdraw(
+                    _escrowId,
+                    _approved,
+                    _to,
+                    _agentData
+                ), "_withdraw: The agent rejects the withdraw");
+            } else {
+              require(msg.sender == escrow.agent, "_withdraw: The sender should be the _approved or the agent");
+            }
+        }
 
         if (escrow.toAgent != 0)
             escrow.token20.safeTransfer(escrow.agent, escrow.toAgent);
