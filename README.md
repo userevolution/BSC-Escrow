@@ -32,5 +32,5 @@ This is a happy example, but can be others, if the agent its not a contracts is 
 
 ## Documentation
 
-  - ERC20Escrow (TODO)
-  - ERC721Escrow (TODO)
+  - [ERC20Escrow](https://github.com/rotcivegaf/BSC-Escrow/blob/master/ERC20Escrow_DOCUMENTATION.md)
+  - [ERC721Escrow](TODO)
