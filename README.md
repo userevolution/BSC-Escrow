@@ -24,9 +24,11 @@ We have:
 
 After of check conditions of buying the `House`, the participants need to deposit the `House` and the `100.000 USDC`
 
-In the first transaction, the `Buyer` deposit the `100.000 USDC` in the `ERC20Escrow` contract
+In the first transaction, someone create the two escrows(ERC20Escrow and ERC721Escrow) can be the `Buyer` or the `Seller` or some wallet
 
-In the second transaction the `Seller` deposit the `House` in the `ERC721Escrow` contract, the `Agent contract` check if the deposit of `100.000 USDC` it's done, if true, it withdraw the `House` to the `Buyer` and the `100.000 USDC` to the `Seller`
+In the second transaction, the `Buyer` deposit the `100.000 USDC` in the `ERC20Escrow` contract
+
+In the third transaction the `Seller` deposit the `House` in the `ERC721Escrow` contract, the `Agent contract` check if the deposit of `100.000 USDC` it's done, if true, it withdraw the `House` to the `Buyer` and the `100.000 USDC` to the `Seller`
 
 This is a happy example, but can be others, if the agent its not a contracts is a wallet and the depositant dont withdraw the ERC20/721 to the Beneficiary, this agent should be mediate betweeen both
 
