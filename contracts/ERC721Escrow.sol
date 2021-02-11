@@ -65,7 +65,7 @@ contract ERC721Escrow {
 
         @dev The id of the escrow is generated with keccak256 function using the parameters of the function
 
-        @param _agent The agent address
+        @param _agent The agent address(Agent contract or wallet)
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _token721 The ERC721 token address
@@ -110,9 +110,10 @@ contract ERC721Escrow {
             using the address of this contract, the sender(agent), the _depositant,
             the _beneficiary, the _token721, the _tokenId, the _token20, the _toAgent and the salt number
 
-            If the agent is not a contact, it will be the sender of the transaction and the escrow calls the create function of the agent contract
+            If the agent is a contact the escrow calls the create function of agent contract
+            If the agent is a wallet it will be the sender of the transaction
 
-        @param _agent The agent address
+        @param _agent The agent address(Agent contract or wallet)
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _token721 The ERC721 token address
@@ -166,7 +167,7 @@ contract ERC721Escrow {
 
         @dev The signature can be canceled with cancelSignature function
 
-        @param _agent The agent address
+        @param _agent The agent address(Agent contract or wallet)
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _token721 The ERC721 token address

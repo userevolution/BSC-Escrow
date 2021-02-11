@@ -71,7 +71,7 @@ contract ERC20Escrow {
 
         @dev The id of the escrow is generated with the keccak256 function using the parameters of the function
 
-        @param _agent The agent address
+        @param _agent The agent address(Agent contract or wallet)
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _agentFee The fee percentage(calculate in BASE), this fee will be sent to the agent when the escrow is withdrawn
@@ -114,10 +114,12 @@ contract ERC20Escrow {
             using the address of this contract, the sender(agent), the _depositant,
             the _beneficiary, the _agentFee, the _token and the salt number
 
-            If the agent is not a contact, it will be the sender of the transaction and the escrow calls the create function of agent contract
+            If the agent is a contact the escrow calls the create function of agent contract
+            If the agent is a wallet it will be the sender of the transaction
+
             The _agentFee should below or equal to 1000(10%)
 
-        @param _agent The agent address
+        @param _agent The agent address(Agent contract or wallet)
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _agentFee The fee percentage(calculate in BASE), this fee will be sent to the agent when the escrow is withdrawn
@@ -163,7 +165,7 @@ contract ERC20Escrow {
 
         @dev The signature can be canceled with cancelSignature function
 
-        @param _agent The agent address
+        @param _agent The agent address(Agent contract or wallet)
         @param _depositant The depositant address
         @param _beneficiary The beneficiary address
         @param _agentFee The fee percentage(calculate in BASE), this fee will be sent to the agent when the escrow is withdrawn
