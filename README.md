@@ -26,23 +26,33 @@ After of check conditions of buying the `House`, the participants need to deposi
 
 In the first transaction, someone create the two escrows(ERC20Escrow and ERC721Escrow) can be the `Buyer` or the `Seller` or some wallet
 
-<img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/0%20create.svg" width="400" />
+<p align="center">
+  <img src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/0%20create.svg" width="400" />
+</p>
 
 In the second transaction, the `Buyer` deposit the `100.000 USDC` in the `ERC20Escrow` contract
 
-<img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/1%20deposit.svg" width="400" />
+<p align="center">
+  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/1%20deposit.svg" width="400" />
+</p>
 
 In the third transaction, the `Seller` deposit the `House` in the `ERC721Escrow` contract:
 
-<img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20deposit.svg" width="400" />
+<p align="center">
+  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20deposit.svg" width="400" />
+</p>
 
 The `Agent contract` check if the deposit of `100.000 USDC` it's done:
 
-<img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20check%20deposit.svg" width="400" />
+<p align="center">
+  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20check%20deposit.svg" width="400" />
+</p>
 
 It withdraw the `House` to the `Buyer` and the `100.000 USDC` to the `Seller`:
 
-<img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20withdraw.svg" width="400" />
+<p align="center">
+  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20withdraw.svg" width="400" />
+</p>
 
 All in the same transaction
 
