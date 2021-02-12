@@ -32,19 +32,19 @@ In the second transaction, the `Buyer` deposit the `100.000 USDC` in the `ERC20E
 
 <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/1%20deposit.svg" width="400" />
 
-In the third transaction the `Seller` deposit the `House` in the `ERC721Escrow` contract, the `Agent contract` check if the deposit of `100.000 USDC` it's done, if true, it withdraw the `House` to the `Buyer` and the `100.000 USDC` to the `Seller`
-
-`Seller` deposit the `House` in the `ERC721Escrow` contract:
+In the third transaction, the `Seller` deposit the `House` in the `ERC721Escrow` contract:
 
 <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20deposit.svg" width="400" />
 
-`Agent contract` check if the deposit of `100.000 USDC`:
+The `Agent contract` check if the deposit of `100.000 USDC` it's done:
 
 <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20check%20deposit.svg" width="400" />
 
 It withdraw the `House` to the `Buyer` and the `100.000 USDC` to the `Seller`:
 
 <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20withdraw.svg" width="400" />
+
+All in the same transaction
 
 This is a happy example, but can be others, if the agent its not a contracts is a wallet and the depositant dont withdraw the ERC20/721 to the Beneficiary, this agent should be mediate betweeen both
 
