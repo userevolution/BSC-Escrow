@@ -33,25 +33,25 @@ In the first transaction, someone create the two escrows(ERC20Escrow and ERC721E
 In the second transaction, the `Buyer` deposit the `100.000 USDC` in the `ERC20Escrow` contract
 
 <p align="center">
-  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/1%20deposit.svg" width="400" />
+  <img src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/1%20deposit.svg" width="400" />
 </p>
 
 In the third transaction, the `Seller` deposit the `House` in the `ERC721Escrow` contract:
 
 <p align="center">
-  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20deposit.svg" width="400" />
+  <img src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20deposit.svg" width="400" />
 </p>
 
 The `Agent contract` check if the deposit of `100.000 USDC` it's done:
 
 <p align="center">
-  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20check%20deposit.svg" width="400" />
+  <img src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20check%20deposit.svg" width="400" />
 </p>
 
 It withdraw the `House` to the `Buyer` and the `100.000 USDC` to the `Seller`:
 
 <p align="center">
-  <img align="center" src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20withdraw.svg" width="400" />
+  <img src="https://github.com/rotcivegaf/BSC-Escrow/blob/master/img/2%20withdraw.svg" width="400" />
 </p>
 
 All in the same transaction
