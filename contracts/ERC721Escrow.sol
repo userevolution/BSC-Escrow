@@ -10,7 +10,7 @@ import "./interfaces/IERC721Agent.sol";
 
 /**
     @title ERC721 token escrow
-    @author Victor Fage <victorfage@gmail.com>
+    @author Victor Fage <victorfage@gmail.com> <https://github.com/rotcivegaf>
 */
 contract ERC721Escrow {
     using SafeERC20 for IERC20;

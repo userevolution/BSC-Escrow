@@ -13,6 +13,11 @@ You need a notary to manage an escrow and you have to pay a lot of taxes and fee
 
 With these contracts, I search to fix this issue, remove the taxes and change the notary for a wallet or a contract
 
+## Addresses Testnet
+
+  - [ERC20Escrow](https://testnet.bscscan.com/address/0xcbff7cae02af7d46fec6db73be376abe597f6df4#code)
+  - [ERC721Escrow](https://testnet.bscscan.com/address/0x0b7747cad05b31680282eae03d1dcef6bf840e0b#code)
+
 ## Full Example
 
 We have:
